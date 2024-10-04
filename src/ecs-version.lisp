@@ -190,12 +190,7 @@ SOFTWARE.
     (setf *fps* (round 1 dt)))
   (ecs:run-systems :dt (float dt 0.0)))
 
-(defparameter *fps-history* (cl-containers:make-ring-buffer 10000))
 (defun render ()
-  (cl-containers:insert-item *fps-history* *fps*)
   (al:draw-text *font* (al:map-rgba 255 255 255 255) 0 0 0
                 (format nil "~d FPS" *fps*)))
 
-#+nil
-(let ((h (cl-containers:contents *fps-history*)))
-  (format nil "Min: ~a Max ~a Mean ~$ SD ~$" (lisp-stat:seq-min h) (lisp-stat:seq-max h) (float (lisp-stat:mean h)) (lisp-stat:sd h)))

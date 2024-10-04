@@ -1,3 +1,5 @@
+(declaim (optimize (speed 3) (space 3) (safety 1) (debug 1)))
+
 (defpackage #:al
   (:documentation
     "Proxy package replacing the allegro functions called by ecs-version with lgame ones instead
@@ -12,7 +14,25 @@
 
 (defpackage #:object-version
   (:use #:cl)
-  (:export #:init #:update #:render))
+  (:export #:init #:tick #:quit)
+  (:import-from #:lgame.sprite
+                #:sprite
+                #:cleaned-on-kill-mixin
+                #:add-groups-mixin
+                #:add-groups
+                #:.image
+                #:.rect
+
+                #:update
+                #:draw
+                #:kill)
+  (:import-from #:lgame.loader
+                #:get-texture)
+  (:import-from #:lgame.rect
+                #:rect-coord
+                #:move-rect
+                #:set-rect
+                #:get-texture-rect))
 
 (defpackage #:ecs-compare
   (:use #:cl)

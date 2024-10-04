@@ -3,9 +3,7 @@
   :author "Jach <jach@thejach.com>"
   :license "Public Domain/Unlicense"
   :depends-on ("lgame"
-               "cl-fast-ecs"
-               "cl-containers"
-               "lisp-stat")
+               "cl-fast-ecs")
   :components ((:module "src/"
                 :serial t
                 :components ((:file "packages")
