@@ -1,4 +1,7 @@
 (in-package #:al)
+#|
+This file is to wrap the allegro methods used by the ecs code to instead use lgame methods
+|#
 
 (defun asset-path (basename)
   "Converts basename path, presumed to refer to a resource in the assets/ folder,

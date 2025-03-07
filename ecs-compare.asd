@@ -3,7 +3,8 @@
   :author "Jach <jach@thejach.com>"
   :license "Public Domain/Unlicense"
   :depends-on ("lgame"
-               "cl-fast-ecs")
+               "cl-fast-ecs"
+               "com.thejach.frame-chronicle")
   :components ((:module "src/"
                 :serial t
                 :components ((:file "packages")

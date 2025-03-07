@@ -2,10 +2,6 @@
 
 (defvar *all-group* nil)
 
-(declaim (inline dt))
-(defun dt ()
-  (min 0.25 (* (the double-float (+ lgame.time:*last-frame-duration* lgame.time:*last-any-delay*)) 1d-3)))
-
 (defclass game-object (sprite add-groups-mixin cleaned-on-kill-mixin)
   ())
 
@@ -19,6 +15,18 @@
         (.rect self) (get-texture-rect image))
   (move-rect (.rect self) pos-x pos-y))
 
+(defmethod draw ((self background))
+  "Draw the bg objects 'scaled' by 1 and shifted over"
+  (let ((x (sdl2:rect-x (.rect self)))
+        (y (sdl2:rect-y (.rect self)))
+        (w (sdl2:rect-width (.rect self)))
+        (h (sdl2:rect-height (.rect self))))
+  (al:draw-scaled-bitmap (.image self)
+                         0 0 w h ; src rect
+                         (- x (* 0.5 w))
+                         (- y (* 0.5 h))
+                         w h ; dst rect
+                         0)))
 
 
 (defclass planet (game-object)
@@ -99,6 +107,11 @@
     (incf (aref (.position self) 0) (* dt (aref (.velocity self) 0)))
     (incf (aref (.position self) 1) (* dt (aref (.velocity self) 1)))
 
+    (fc:record :obj-new-pos (list (aref (.position self) 0)
+                                  (aref (.position self) 1)))
+    (fc:record :obj-new-speed (list (aref (.velocity self) 0)
+                                    (aref (.velocity self) 1)))
+
     (let ((new-x (aref (.position self) 0))
           (new-y (aref (.position self) 1))
           (planet-half-w (/ (sdl2:rect-width (.rect planet)) 2.0))
@@ -116,7 +129,8 @@
 
 (defmethod draw ((self fps-display))
   (let* ((font (lgame.font:load-font (al::asset-path "inconsolata.ttf") 24))
-         (msg (format nil "~d FPS" (round 1 (dt))))
+         (dt (dt))
+         (msg (format nil "~d FPS" (if (zerop dt) 0 (round 1 dt))))
          (texture (lgame.font:render-text font msg 255 255 255)))
     (lgame.rect:with-rect (r 0 0 (sdl2:texture-width texture) (sdl2:texture-height texture))
       (sdl2:render-copy lgame:*renderer* texture :dest-rect r))
@@ -129,7 +143,8 @@
                  :image (get-texture "parallax-space-stars.png")
                  :pos-x 400 :pos-y 200
                  :groups *all-group*)
-  (make-instance 'background :image (get-texture "parallax-space-far-planets.png")
+  (make-instance 'background
+                 :image (get-texture "parallax-space-far-planets.png")
                  :pos-x 100 :pos-y 100
                  :groups *all-group*)
   (let* ((planet (make-instance 'planet :groups *all-group*)))
@@ -137,6 +152,8 @@
         (make-instance 'asteroid :planet planet :groups *all-group*)))
   (make-instance 'fps-display :groups *all-group*))
 
+(defun dt ()
+  (lgame.time:dt))
 
 (defun tick ()
   (update *all-group*)

@@ -68,6 +68,13 @@ SOFTWARE.
    :finally (al:hold-bitmap-drawing nil))
   (let ((scaled-width (* image-scale image-width))
         (scaled-height (* image-scale image-height)))
+    (when (or (= position-x 400)
+            (= position-y 100))
+      (fc:record :ecs-drawing (list :image-scale image-scale
+                                    :image-width image-width
+                                    :image-height image-height
+                                    :scaled-width scaled-width
+                                    )))
     (al:draw-scaled-bitmap image-bitmap 0 0
                            image-width image-height
                            (- position-x (* 0.5 scaled-width))
@@ -79,14 +86,20 @@ SOFTWARE.
    :components-rw (position)
    :arguments ((:dt single-float)))
   (incf position-x (* dt speed-x))
-  (incf position-y (* dt speed-y)))
+  (incf position-y (* dt speed-y))
+  (fc:record :system-move-dt dt)
+  (fc:record :system-move-new-pos (list position-x position-y))
+  )
 
 (ecs:define-system accelerate
   (:components-ro (acceleration)
    :components-rw (speed)
    :arguments ((:dt single-float)))
   (incf speed-x (* dt acceleration-x))
-  (incf speed-y (* dt acceleration-y)))
+  (incf speed-y (* dt acceleration-y))
+  (fc:record :system-accel-dt dt)
+  (fc:record :system-accel-new-speed (list speed-x speed-y))
+  )
 
 (ecs:define-system pull
   (:components-ro (position)
@@ -148,7 +161,13 @@ SOFTWARE.
      `((:position :x 100.0 :y 100.0)
        (:image :bitmap ,background-bitmap-2
                :width ,(float (al:get-bitmap-width background-bitmap-2))
-               :height ,(float (al:get-bitmap-height background-bitmap-2))))))
+               :height ,(float (al:get-bitmap-height background-bitmap-2)))))
+  (fc:record :ecs-background-data (list :x1 400.0 :y1 200.0
+                                        :width1 (float (al:get-bitmap-width background-bitmap-1))
+                                        :height1 (float (al:get-bitmap-height background-bitmap-1))
+                                        :x2 100.0 :y2 100.0
+                                        :width2 (float (al:get-bitmap-width background-bitmap-2))
+                                        :height2 (float (al:get-bitmap-height background-bitmap-2)))))
   (let ((planet-bitmap (al:ensure-loaded
                         #'al:load-bitmap
                         "parallax-space-big-planet.png")))
@@ -188,6 +207,7 @@ SOFTWARE.
 (defun update (dt)
   (unless (zerop dt)
     (setf *fps* (round 1 dt)))
+  (fc:record :ecs-dt-in-update (float dt 0.0))
   (ecs:run-systems :dt (float dt 0.0)))
 
 (defun render ()

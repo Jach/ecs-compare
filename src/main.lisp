@@ -20,12 +20,6 @@
 (defvar *ecs-ticks* 0.0d0)
 (defvar *ecs-dt* 0.0d0)
 
-(declaim (inline update-ecs-ticks))
-(defun update-ecs-ticks ()
-  (let ((new-ticks (al:get-time)))
-    (setf *ecs-dt* (- new-ticks *ecs-ticks*)
-          *ecs-ticks* new-ticks)))
-
 (defun window-id (window)
   (lgame::sdl-get-window-id window))
 
@@ -36,6 +30,8 @@
 
 (defun main ()
   (lgame:init)
+  (fc:make-store :sample-on-frames (loop for i below 10 collect i))
+
   (setf *ecs-window* (lgame.display:create-centered-window "ECS Simulation" (first +window-size+) (second +window-size+))
         *object-window* (lgame.display:create-centered-window "OOP Simulation" (first +window-size+) (second +window-size+))
         *ecs-window-closed?* nil
@@ -74,6 +70,7 @@
     (lgame:quit)))
 
 (defun game-tick ()
+  (fc:frame-tick)
   (lgame.event:do-event (event)
     (when (and (= (event-type event) lgame::+sdl-windowevent+)
                (= (lgame.event:ref event :window :event) lgame::+sdl-windowevent-close+))
@@ -109,13 +106,54 @@
   (livesupport:update-repl-link)
   (lgame.time:clock-tick))
 
+(declaim (inline update-ecs-ticks))
+(defun update-ecs-ticks ()
+  (let ((new-ticks (al:get-time)))
+    (setf *ecs-dt* (- new-ticks *ecs-ticks*)
+          *ecs-ticks* new-ticks))
+    (fc:record :ecs-dt *ecs-dt*)
+    (fc:record :ecs-ticks *ecs-ticks*))
+
 (defun game-tick-ecs ()
   (update-ecs-ticks)
   (ecs-version:update *ecs-dt*)
   (ecs-version:render))
 
 (defun game-tick-object ()
+  (fc:record :obj-dt (object-version::dt))
   (object-version:tick))
 
 (eval-when (:execute)
   (main))
+
+(defun query-stuff ()
+  (fc:query nil)
+
+  (fc:query :ecs-dt)
+  (fc:query :ecs-ticks)
+
+  (fc:query :obj-dt)
+  (fc:query :ecs-dt-in-update)
+  ; so ecs-dt-in-update starts with 0.0 at frame 0, then frame 1 and on roughly match obj-dt.
+  ; obj-dt starts with 0.1 at frame 0... this is because lgame dt is using values that are only updated by
+  ; clock-tick... either way, the frame0 dts are suspect, but 0 makes more sense I guess.let's do that.
+
+  (fc:query :system-move-dt :frames 1)
+
+  (take 3 (fc:query :system-move-new-pos :frames 0))
+  (take 3 (fc:query :obj-new-pos :frames 0))
+
+  (take 3 (fc:query :system-move-new-pos :frames 1))
+  (take 3 (fc:query :obj-new-pos :frames 1))
+
+  (take 3 (fc:query :system-accel-new-speed :frames 0))
+  (take 3 (fc:query :obj-new-speed :frames 0))
+
+  (take 3 (fc:query :system-accel-new-speed :frames 1))
+  (take 3 (fc:query :obj-new-speed :frames 1))
+)
+
+(defun take (n list)
+  (when (and (plusp n)
+             (listp list))
+    (cons (first list) (take (1- n) (rest list)))))
