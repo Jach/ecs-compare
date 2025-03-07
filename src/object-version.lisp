@@ -107,11 +107,6 @@
     (incf (aref (.position self) 0) (* dt (aref (.velocity self) 0)))
     (incf (aref (.position self) 1) (* dt (aref (.velocity self) 1)))
 
-    (fc:record :obj-new-pos (list (aref (.position self) 0)
-                                  (aref (.position self) 1)))
-    (fc:record :obj-new-speed (list (aref (.velocity self) 0)
-                                    (aref (.velocity self) 1)))
-
     (let ((new-x (aref (.position self) 0))
           (new-y (aref (.position self) 1))
           (planet-half-w (/ (sdl2:rect-width (.rect planet)) 2.0))

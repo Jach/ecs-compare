@@ -30,7 +30,7 @@
 
 (defun main ()
   (lgame:init)
-  (fc:make-store :sample-on-frames (loop for i below 10 collect i))
+  ;(fc:make-store :sample-on-frames (loop for i below 10 collect i))
 
   (setf *ecs-window* (lgame.display:create-centered-window "ECS Simulation" (first +window-size+) (second +window-size+))
         *object-window* (lgame.display:create-centered-window "OOP Simulation" (first +window-size+) (second +window-size+))
@@ -69,8 +69,14 @@
     (object-version:quit)
     (lgame:quit)))
 
+(declaim (inline update-ecs-ticks))
+(defun update-ecs-ticks ()
+  (let ((new-ticks (al:get-time)))
+    (setf *ecs-dt* (- new-ticks *ecs-ticks*)
+          *ecs-ticks* new-ticks)))
+
 (defun game-tick ()
-  (fc:frame-tick)
+  ;(fc:frame-tick)
   (lgame.event:do-event (event)
     (when (and (= (event-type event) lgame::+sdl-windowevent+)
                (= (lgame.event:ref event :window :event) lgame::+sdl-windowevent-close+))
@@ -106,26 +112,18 @@
   (livesupport:update-repl-link)
   (lgame.time:clock-tick))
 
-(declaim (inline update-ecs-ticks))
-(defun update-ecs-ticks ()
-  (let ((new-ticks (al:get-time)))
-    (setf *ecs-dt* (- new-ticks *ecs-ticks*)
-          *ecs-ticks* new-ticks))
-    (fc:record :ecs-dt *ecs-dt*)
-    (fc:record :ecs-ticks *ecs-ticks*))
-
 (defun game-tick-ecs ()
   (update-ecs-ticks)
   (ecs-version:update *ecs-dt*)
   (ecs-version:render))
 
 (defun game-tick-object ()
-  (fc:record :obj-dt (object-version::dt))
   (object-version:tick))
 
 (eval-when (:execute)
   (main))
 
+#|
 (defun query-stuff ()
   (fc:query nil)
 
@@ -151,9 +149,13 @@
 
   (take 3 (fc:query :system-accel-new-speed :frames 1))
   (take 3 (fc:query :obj-new-speed :frames 1))
+  (fc:query :ecs-background-data)
+  (fc:query :ecs-drawing :frames 0)
 )
 
 (defun take (n list)
   (when (and (plusp n)
              (listp list))
     (cons (first list) (take (1- n) (rest list)))))
+|#
+
