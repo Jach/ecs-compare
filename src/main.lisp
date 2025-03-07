@@ -1,8 +1,8 @@
 (in-package #:ecs-compare)
 
 ; should probably just make a window class...
-(defvar *ecs-window*)
-(defvar *object-window*)
+(defvar *ecs-window* nil)
+(defvar *object-window* nil)
 
 (defvar *ecs-window-closed?* nil)
 (defvar *object-window-closed?* nil)
@@ -28,35 +28,48 @@
     ((window-id *ecs-window*) (setf *ecs-window-closed?* t) (lgame::sdl-hide-window *ecs-window*))
     ((window-id *object-window*) (setf *object-window-closed?* t) (lgame::sdl-hide-window *object-window*))))
 
-(defun main ()
+(defun main (&key only-ecs? only-oop? &aux both?)
+  (setf both? (and (not only-ecs?) (not only-oop?)))
   (lgame:init)
   ;(fc:make-store :sample-on-frames (loop for i below 10 collect i))
 
-  (setf *ecs-window* (lgame.display:create-centered-window "ECS Simulation" (first +window-size+) (second +window-size+))
-        *object-window* (lgame.display:create-centered-window "OOP Simulation" (first +window-size+) (second +window-size+))
-        *ecs-window-closed?* nil
-        *object-window-closed?* nil
-        *ecs-window-paused?* nil
-        *ecs-window-paused?* nil
-        *ecs-renderer* (lgame.display:create-renderer *ecs-window*)
-        *object-renderer* (lgame.display:create-renderer *object-window*))
+  (setf *ecs-window-closed?* t
+        *ecs-window-paused?* t
+        *object-window-closed?* t
+        *object-window-paused?* t)
+
+  (when (or both? only-ecs?)
+    (setf
+      *ecs-window* (lgame.display:create-centered-window "ECS Simulation" (first +window-size+) (second +window-size+))
+      *ecs-renderer* (lgame.display:create-renderer *ecs-window*)
+      *ecs-window-closed?* nil
+      *ecs-window-paused?* nil))
+  (when (or both? only-oop?)
+    (setf
+      *object-window* (lgame.display:create-centered-window "OOP Simulation" (first +window-size+) (second +window-size+))
+      *object-renderer* (lgame.display:create-renderer *object-window*)
+      *object-window-closed?* nil
+      *object-window-paused?* nil))
 
   ; replace the asdf call with something more principled if making a binary,
   ; check other files too
   (lgame.loader:create-texture-loader (merge-pathnames #p"assets/" (asdf:system-source-directory "ecs-compare")))
 
   (sdl2:pump-events)
-  (multiple-value-bind (x y) (sdl2:get-window-position *object-window*)
-    (sdl2:set-window-position *object-window* x (+ y 50 (second +window-size+))))
+  (when *object-window*
+    (multiple-value-bind (x y) (sdl2:get-window-position *object-window*)
+      (sdl2:set-window-position *object-window* x (+ y 50 (second +window-size+)))))
 
   ;(lgame::sdl-raise-window *ecs-window*)
   ;(lgame::sdl-raise-window *object-window*)
 
-  (let ((lgame:*renderer* *ecs-renderer*))
-    (ecs-version:init (first +window-size+) (second +window-size+) *asteroids-count*))
+  (when *ecs-window*
+    (let ((lgame:*renderer* *ecs-renderer*))
+      (ecs-version:init (first +window-size+) (second +window-size+) *asteroids-count*)))
 
-  (let ((lgame:*renderer* *object-renderer*))
-    (object-version:init *asteroids-count*))
+  (when *object-window*
+    (let ((lgame:*renderer* *object-renderer*))
+      (object-version:init *asteroids-count*)))
 
   (lgame.time:clock-start)
   (setf *ecs-ticks* (/ lgame.time::*tick-us* 1d6))
@@ -66,7 +79,8 @@
           (livesupport:continuable
             (game-tick)))
 
-    (object-version:quit)
+    (when *object-window*
+      (object-version:quit))
     (lgame:quit)))
 
 (declaim (inline update-ecs-ticks))
