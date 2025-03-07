@@ -13,4 +13,4 @@ are:
 * [Asteroids](https://opengameart.org/content/asteroids)
 * [Space Background](https://opengameart.org/content/space-background-3)
 
-The rest of the new code is released into the public domain / under the Unlicense.
+The rest of the new code is similarly released under the MIT license with copyright to Jach.
