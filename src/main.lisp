@@ -96,7 +96,8 @@
         (update-ecs-ticks))
 
       (when (= (key-scancode event) lgame::+sdl-scancode-o+)
-        (setf *object-window-paused?* (not *object-window-paused?*)))))
+        (setf *object-window-paused?* (not *object-window-paused?*))
+        (lgame.time:clock-tick))))
 
   (when (not *ecs-window-paused?*)
     (let ((lgame:*renderer* *ecs-renderer*))
