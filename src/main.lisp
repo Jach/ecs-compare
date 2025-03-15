@@ -135,9 +135,6 @@
 (defun game-tick-object ()
   (object-version:tick))
 
-(eval-when (:execute)
-  (main))
-
 #|
 (defun query-stuff ()
   (fc:query nil)
