@@ -17,6 +17,8 @@ pausing the OOP version (bottom).
 If you just want to run one or the other individually, you can give the optional
 keyword arguments `:only-ecs? t` or `:only-oop? t` to `main`.
 
+![](screenshot.png)
+
 # License
 
 `ecs-version.lisp` is under the MIT license with copyright to Andrew Kravchuk,
