@@ -69,7 +69,7 @@
 
   (when *object-window*
     (let ((lgame:*renderer* *object-renderer*))
-      (object-version:init *asteroids-count*)))
+      (object-version:init *asteroids-count* :use-field? t)))
 
   (lgame.time:clock-start)
   (setf *ecs-ticks* (/ lgame.time::*tick-us* 1d6))

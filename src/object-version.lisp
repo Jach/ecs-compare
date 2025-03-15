@@ -60,7 +60,6 @@
 
    (pos :accessor .position :initform (vector 0.0 0.0))
    (vel :accessor .velocity :initform (vector 0.0 0.0))
-   (acc :accessor .acceleration :initform (vector 0.0 0.0))
 
    (planet :accessor .planet :initarg :planet)))
 
@@ -98,8 +97,6 @@
          (accel (/ (.mass planet) distance-squared))
          (accel-x (* accel (cos angle)))
          (accel-y (* accel (sin angle))))
-    (setf (aref (.acceleration self) 0) accel-x
-          (aref (.acceleration self) 1) accel-y)
 
     (incf (aref (.velocity self) 0) (* dt accel-x))
     (incf (aref (.velocity self) 1) (* dt accel-y))
@@ -132,7 +129,8 @@
     (sdl2:destroy-texture texture)))
 
 
-(defun init (asteroids)
+(defun init (asteroids &key (use-field? nil))
+  ;(setf lparallel:*kernel* (lparallel:make-kernel 12))
   (setf *all-group* (make-instance 'lgame.sprite:ordered-group))
   (make-instance 'background
                  :image (get-texture "parallax-space-stars.png")
@@ -143,8 +141,11 @@
                  :pos-x 100 :pos-y 100
                  :groups *all-group*)
   (let* ((planet (make-instance 'planet :groups *all-group*)))
-    (dotimes (_ asteroids)
-        (make-instance 'asteroid :planet planet :groups *all-group*)))
+    (if (not use-field?)
+        (dotimes (_ asteroids)
+          (make-instance 'asteroid :planet planet :groups *all-group*))
+        (make-instance 'asteroid-field :planet planet :asteroids asteroids :groups *all-group*)))
+        ;(make-instance 'asteroid-field-soa :planet planet :asteroids asteroids :groups *all-group*)))
   (make-instance 'fps-display :groups *all-group*))
 
 (defun dt ()
@@ -158,3 +159,188 @@
   (lgame.sprite:do-sprite (s *all-group*)
     (kill s)))
 
+; More optimized asteroid-field version added later:
+
+(defclass asteroid-field (sprite add-groups-mixin)
+  ((asteroids :accessor .asteroids)
+   (planet :accessor .planet :initarg :planet)))
+
+(defstruct simple-asteroid
+  texture
+  (pos-x 0.0)
+  (pos-y 0.0)
+  (vel-x 0.0)
+  (vel-y 0.0)
+  scaled-w
+  scaled-h)
+
+(defmethod initialize-instance :after ((self asteroid-field) &key planet asteroids &aux textures)
+  (let ((tmp-asteroid (make-instance 'asteroid :planet planet)))
+    (setf textures (/textures tmp-asteroid))
+    (kill tmp-asteroid))
+
+  (setf (.asteroids self) (make-array asteroids))
+  (dotimes (i asteroids)
+    (let ((r (random 20.0))
+          (angle (random (* 2 pi)))
+          (planet-y (rect-coord (.rect (.planet self)) :centery))
+          (image (get-texture (alexandria:random-elt textures)))
+          (asteroid (make-simple-asteroid)))
+      (setf (simple-asteroid-texture asteroid) image
+            (simple-asteroid-pos-x asteroid) (+ 200 (* r (cos angle)))
+            (simple-asteroid-pos-y asteroid) (+ planet-y (* r (sin angle)))
+            (simple-asteroid-vel-x asteroid) (+ -5 (random 15.0))
+            (simple-asteroid-vel-y asteroid) (+ 30 (random 30.0)))
+
+      (let* ((scale (+ 0.1 (random 0.9)))
+             (scaled-w (* scale (sdl2:texture-width image)))
+             (scaled-h (* scale (sdl2:texture-height image))))
+        (setf (simple-asteroid-scaled-w asteroid) scaled-w
+              (simple-asteroid-scaled-h asteroid) scaled-h)
+        (decf (simple-asteroid-pos-x asteroid) (* 0.5 scaled-w))
+        (decf (simple-asteroid-pos-y asteroid) (* 0.5 scaled-h)))
+
+      (setf (aref (.asteroids self) i) asteroid))))
+
+(defmethod update ((self asteroid-field))
+  (let* ((dt (dt))
+         (asteroids (.asteroids self))
+         (planet (.planet self))
+         (planet-x (rect-coord (.rect planet) :centerx))
+         (planet-y (rect-coord (.rect planet) :centery))
+         (planet-half-w (/ (sdl2:rect-width (.rect planet)) 2.0))
+         (planet-half-h (/ (sdl2:rect-height (.rect planet)) 2.0)))
+    (loop for asteroid across asteroids
+          for i from 0
+          when asteroid
+          do
+    ;(lparallel:pmapc
+    ;  (lambda (i)
+    ;    (alexandria:when-let ((asteroid (aref asteroids i)))
+          (let* ((distance-x (- planet-x (simple-asteroid-pos-x asteroid)))
+                 (distance-y (- planet-y (simple-asteroid-pos-y asteroid)))
+                 (angle (atan distance-y distance-x))
+                 (distance-squared (+ (expt distance-x 2) (expt distance-y 2)))
+                 (accel (/ (.mass planet) distance-squared))
+                 (accel-x (* accel (cos angle)))
+                 (accel-y (* accel (sin angle))))
+            (incf (simple-asteroid-vel-x asteroid) (* dt accel-x))
+            (incf (simple-asteroid-vel-y asteroid) (* dt accel-y))
+
+            (incf (simple-asteroid-pos-x asteroid) (* dt (simple-asteroid-vel-x asteroid)))
+            (incf (simple-asteroid-pos-y asteroid) (* dt (simple-asteroid-vel-y asteroid)))
+
+            (when (<= (+ (expt (/ (- (simple-asteroid-pos-x asteroid) planet-x) planet-half-w) 2)
+                         (expt (/ (- (simple-asteroid-pos-y asteroid) planet-y) planet-half-h) 2))
+                      1.0)
+              ;; 'remove' it
+              (setf (aref (.asteroids self) i) nil)))
+    ;      )) (loop for i below (length asteroids) collect i))
+          )
+  ))
+
+
+(defmethod draw ((self asteroid-field))
+  (loop for asteroid across (.asteroids self)
+        when asteroid
+        do
+        (lgame.rect:with-rect (r (simple-asteroid-pos-x asteroid)
+                                 (simple-asteroid-pos-y asteroid)
+                                 (simple-asteroid-scaled-w asteroid)
+                                 (simple-asteroid-scaled-h asteroid))
+          (sdl2:render-copy lgame:*renderer* (simple-asteroid-texture asteroid) :dest-rect r))))
+
+
+; Another version, using a struct of arrays approach.
+
+(defstruct pair
+  (x 0.0)
+  (y 0.0))
+
+(defstruct soa-asteroids
+  textures
+  positions
+  velocities
+  scales)
+
+(defclass asteroid-field-soa (sprite add-groups-mixin)
+  ((asteroids :accessor .asteroids)
+   (planet :accessor .planet :initarg :planet)))
+
+(defmethod initialize-instance :after ((self asteroid-field-soa) &key planet asteroids &aux textures all-asteroids)
+  (let ((tmp-asteroid (make-instance 'asteroid :planet planet)))
+    (setf textures (/textures tmp-asteroid))
+    (kill tmp-asteroid))
+
+  (setf all-asteroids (make-soa-asteroids
+                        :textures (make-array asteroids)
+                        :positions (make-array asteroids)
+                        :velocities (make-array asteroids)
+                        :scales (make-array asteroids)))
+  (setf (.asteroids self) all-asteroids)
+
+  (dotimes (i asteroids)
+    (let* ((r (random 20.0))
+           (angle (random (* 2 pi)))
+           (planet-y (rect-coord (.rect (.planet self)) :centery))
+           (image (get-texture (alexandria:random-elt textures)))
+           (pos-x (+ 200 (* r (cos angle))))
+           (pos-y (+ planet-y (* r (sin angle))))
+           (vel-x (+ -5 (random 15.0)))
+           (vel-y (+ 30 (random 30.0)))
+           (scale (+ 0.1 (random 0.9)))
+           (scaled-w (* scale (sdl2:texture-width image)))
+           (scaled-h (* scale (sdl2:texture-height image))))
+      (decf pos-x (* 0.5 scaled-w))
+      (decf pos-y (* 0.5 scaled-h))
+
+      (setf (aref (soa-asteroids-textures all-asteroids) i) image
+            (aref (soa-asteroids-positions all-asteroids) i) (make-pair :x pos-x :y pos-y)
+            (aref (soa-asteroids-velocities all-asteroids) i) (make-pair :x vel-x :y vel-y)
+            (aref (soa-asteroids-scales all-asteroids) i) (make-pair :x scaled-w :y scaled-h)))))
+
+(defmethod update ((self asteroid-field-soa))
+  (let* ((dt (dt))
+         (all-asteroids (.asteroids self))
+         (planet (.planet self))
+         (planet-x (rect-coord (.rect planet) :centerx))
+         (planet-y (rect-coord (.rect planet) :centery))
+         (planet-half-w (/ (sdl2:rect-width (.rect planet)) 2.0))
+         (planet-half-h (/ (sdl2:rect-height (.rect planet)) 2.0)))
+
+    (loop for pos across (soa-asteroids-positions all-asteroids)
+          for vel across (soa-asteroids-velocities all-asteroids)
+          for i from 0
+          when pos
+          do
+          (let* ((distance-x (- planet-x (pair-x pos)))
+                 (distance-y (- planet-y (pair-y pos)))
+                 (angle (atan distance-y distance-x))
+                 (distance-squared (+ (expt distance-x 2) (expt distance-y 2)))
+                 (accel (/ (.mass planet) distance-squared))
+                 (accel-x (* accel (cos angle)))
+                 (accel-y (* accel (sin angle))))
+            (incf (pair-x vel) (* dt accel-x))
+            (incf (pair-y vel) (* dt accel-y))
+
+            (incf (pair-x pos) (* dt (pair-x vel)))
+            (incf (pair-y pos) (* dt (pair-y vel)))
+
+            (when (<= (+ (expt (/ (- (pair-x pos) planet-x) planet-half-w) 2)
+                         (expt (/ (- (pair-y pos) planet-y) planet-half-h) 2))
+                      1.0)
+              ;; 'remove' it, for laziness just from pos
+              (setf (aref (soa-asteroids-positions all-asteroids) i) nil))))))
+
+
+(defmethod draw ((self asteroid-field-soa))
+  (loop for image across (soa-asteroids-textures (.asteroids self))
+        for pos across (soa-asteroids-positions (.asteroids self))
+        for scaled across (soa-asteroids-scales (.asteroids self))
+        when pos
+        do
+        (lgame.rect:with-rect (r (pair-x pos)
+                                 (pair-y pos)
+                                 (pair-x scaled)
+                                 (pair-y scaled))
+          (sdl2:render-copy lgame:*renderer* image :dest-rect r))))
