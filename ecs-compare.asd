@@ -1,7 +1,7 @@
 (defsystem "ecs-compare"
   :description "Comparison of using ECS or a more traditional game object model"
   :author "Jach <jach@thejach.com>"
-  :license "Public Domain/Unlicense"
+  :license "MIT"
   :depends-on ("lgame"
                "cl-fast-ecs"
                ;"lparallel"
