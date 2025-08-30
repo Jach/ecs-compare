@@ -132,7 +132,8 @@ SOFTWARE.
   :test #'equalp)
 
 (defun init (window-width window-height asteroids)
-  (ecs:bind-storage)
+;  (ecs:bind-storage)
+  (ecs:make-storage)
   (let ((background-bitmap-1 (al:ensure-loaded
                               #'al:load-bitmap
                               "parallax-space-stars.png"))

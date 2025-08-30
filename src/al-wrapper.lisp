@@ -25,7 +25,7 @@ This file is to wrap the allegro methods used by the ecs code to instead use lga
 (defun ensure-loaded (_ basename)
   "Bitmap load -> sdl texture load"
   (declare (ignore _))
-  (lgame.loader:load-texture (asset-path basename)))
+  (lgame.texture:.sdl-texture (lgame.loader:load-texture (asset-path basename))))
 
 (declaim (inline get-bitmap-width))
 (defun get-bitmap-width (texture)
@@ -47,9 +47,8 @@ This file is to wrap the allegro methods used by the ecs code to instead use lga
                                          (aref color 1)
                                          (aref color 2)
                                          (aref color 3))))
-    (lgame.rect:with-rect (r x y (sdl2:texture-width texture) (sdl2:texture-height texture))
-      (sdl2:render-copy lgame:*renderer* texture :dest-rect r))
-    (sdl2:destroy-texture texture)))
+    (lgame.render:blit texture (lgame.box:get-texture-box texture))
+    (lgame.texture:destroy-texture texture)))
 
 (declaim (inline load-ttf-font))
 (defun load-ttf-font (path size flags)

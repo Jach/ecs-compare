@@ -17,22 +17,21 @@
   (:export #:init #:tick #:quit)
   (:import-from #:lgame.sprite
                 #:sprite
-                #:cleaned-on-kill-mixin
                 #:add-groups-mixin
                 #:add-groups
                 #:.image
-                #:.rect
+                #:.box
 
                 #:update
                 #:draw
                 #:kill)
   (:import-from #:lgame.loader
                 #:get-texture)
-  (:import-from #:lgame.rect
-                #:rect-coord
-                #:move-rect
-                #:set-rect
-                #:get-texture-rect))
+  (:import-from #:lgame.box
+                #:box-attr
+                #:move-box
+                #:set-box
+                #:get-texture-box))
 
 (defpackage #:ecs-compare
   (:use #:cl)

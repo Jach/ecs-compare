@@ -1,8 +1,9 @@
 (in-package #:object-version)
+;; head to defun init for the main configuration options
 
 (defvar *all-group* nil)
 
-(defclass game-object (sprite add-groups-mixin cleaned-on-kill-mixin)
+(defclass game-object (sprite add-groups-mixin)
   ())
 
 
@@ -12,16 +13,16 @@
 
 (defmethod initialize-instance :after ((self background) &key image pos-x pos-y)
   (setf (.image self) image
-        (.rect self) (get-texture-rect image))
-  (move-rect (.rect self) pos-x pos-y))
+        (.box self) (get-texture-box image))
+  (move-box (.box self) pos-x pos-y))
 
 (defmethod draw ((self background))
   "Draw the bg objects 'scaled' by 1 and shifted over"
-  (let ((x (sdl2:rect-x (.rect self)))
-        (y (sdl2:rect-y (.rect self)))
-        (w (sdl2:rect-width (.rect self)))
-        (h (sdl2:rect-height (.rect self))))
-  (al:draw-scaled-bitmap (.image self)
+  (let ((x (lgame.box:box-x (.box self)))
+        (y (lgame.box:box-y (.box self)))
+        (w (lgame.box:box-width (.box self)))
+        (h (lgame.box:box-height (.box self))))
+  (al:draw-scaled-bitmap (lgame.texture:.sdl-texture (.image self))
                          0 0 w h ; src rect
                          (- x (* 0.5 w))
                          (- y (* 0.5 h))
@@ -34,8 +35,8 @@
 
 (defmethod initialize-instance :after ((self planet) &key)
   (setf (.image self) (get-texture "parallax-space-big-planet.png")
-        (.rect self) (get-texture-rect (.image self)))
-  (setf (rect-coord (.rect self) :center) (rect-coord lgame:*screen-rect* :center)))
+        (.box self) (get-texture-box (.image self)))
+  (setf (box-attr (.box self) :center) (box-attr lgame:*screen-box* :center)))
 
 
 
@@ -66,30 +67,30 @@
 (defmethod initialize-instance :after ((self asteroid) &key)
   (let ((r (random 20.0))
         (angle (random (* 2 pi)))
-        (planet-y (rect-coord (.rect (.planet self)) :centery))
+        (planet-y (box-attr (.box (.planet self)) :centery))
         (image (get-texture (alexandria:random-elt (/textures self)))))
     (setf (aref (.position self) 0) (+ 200 (* r (cos angle)))
           (aref (.position self) 1) (+ planet-y (* r (sin angle)))
           (aref (.velocity self) 0) (+ -5 (random 15.0))
           (aref (.velocity self) 1) (+ 30 (random 30.0))
           (.image self) image)
-    (let* ((rect (get-texture-rect image))
+    (let* ((box (get-texture-box image))
            (scale (+ 0.1 (random 0.9)))
-           (scaled-w (* scale (sdl2:rect-width rect)))
-           (scaled-h (* scale (sdl2:rect-height rect))))
-      (set-rect rect
-                :x (- (aref (.position self) 0) (* 0.5 scaled-w))
-                :y (- (aref (.position self) 1) (* 0.5 scaled-h))
-                :w scaled-w :h scaled-h)
-      (setf (.rect self) rect))))
+           (scaled-w (* scale (lgame.box:box-width box)))
+           (scaled-h (* scale (lgame.box:box-height box))))
+      (set-box box
+               :x (- (aref (.position self) 0) (* 0.5 scaled-w))
+               :y (- (aref (.position self) 1) (* 0.5 scaled-h))
+               :w scaled-w :h scaled-h)
+      (setf (.box self) box))))
 
 (defmethod update ((self asteroid))
   (let* ((dt (dt))
          (pos-x (aref (.position self) 0))
          (pos-y (aref (.position self) 1))
          (planet (.planet self))
-         (planet-x (rect-coord (.rect planet) :centerx))
-         (planet-y (rect-coord (.rect planet) :centery))
+         (planet-x (box-attr (.box planet) :centerx))
+         (planet-y (box-attr (.box planet) :centery))
          (distance-x (- planet-x pos-x))
          (distance-y (- planet-y pos-y))
          (angle (atan distance-y distance-x))
@@ -106,9 +107,9 @@
 
     (let ((new-x (aref (.position self) 0))
           (new-y (aref (.position self) 1))
-          (planet-half-w (/ (sdl2:rect-width (.rect planet)) 2.0))
-          (planet-half-h (/ (sdl2:rect-height (.rect planet)) 2.0)))
-    (set-rect (.rect self) :x new-x :y new-y)
+          (planet-half-w (/ (lgame.box:box-width (.box planet)) 2.0))
+          (planet-half-h (/ (lgame.box:box-height (.box planet)) 2.0)))
+    (set-box (.box self) :x new-x :y new-y)
     (when (<= (+ (expt (/ (- new-x planet-x) planet-half-w) 2)
                  (expt (/ (- new-y planet-y) planet-half-h) 2))
               1.0)
@@ -124,9 +125,8 @@
          (dt (dt))
          (msg (format nil "~d FPS" (if (zerop dt) 0 (round 1 dt))))
          (texture (lgame.font:render-text font msg 255 255 255)))
-    (lgame.rect:with-rect (r 0 0 (sdl2:texture-width texture) (sdl2:texture-height texture))
-      (sdl2:render-copy lgame:*renderer* texture :dest-rect r))
-    (sdl2:destroy-texture texture)))
+    (lgame.render:blit texture (lgame.box:get-texture-box texture))
+    (lgame.texture:destroy-texture texture)))
 
 
 (defun init (asteroids &key (use-field? nil))
@@ -185,7 +185,7 @@
   (dotimes (i asteroids)
     (let ((r (random 20.0))
           (angle (random (* 2 pi)))
-          (planet-y (rect-coord (.rect (.planet self)) :centery))
+          (planet-y (box-attr (.box (.planet self)) :centery))
           (image (get-texture (alexandria:random-elt textures)))
           (asteroid (make-simple-asteroid)))
       (setf (simple-asteroid-texture asteroid) image
@@ -195,8 +195,8 @@
             (simple-asteroid-vel-y asteroid) (+ 30 (random 30.0)))
 
       (let* ((scale (+ 0.1 (random 0.9)))
-             (scaled-w (* scale (sdl2:texture-width image)))
-             (scaled-h (* scale (sdl2:texture-height image))))
+             (scaled-w (* scale (lgame.texture:.width image)))
+             (scaled-h (* scale (lgame.texture:.height image))))
         (setf (simple-asteroid-scaled-w asteroid) scaled-w
               (simple-asteroid-scaled-h asteroid) scaled-h)
         (decf (simple-asteroid-pos-x asteroid) (* 0.5 scaled-w))
@@ -208,10 +208,10 @@
   (let* ((dt (dt))
          (asteroids (.asteroids self))
          (planet (.planet self))
-         (planet-x (rect-coord (.rect planet) :centerx))
-         (planet-y (rect-coord (.rect planet) :centery))
-         (planet-half-w (/ (sdl2:rect-width (.rect planet)) 2.0))
-         (planet-half-h (/ (sdl2:rect-height (.rect planet)) 2.0)))
+         (planet-x (box-attr (.box planet) :centerx))
+         (planet-y (box-attr (.box planet) :centery))
+         (planet-half-w (/ (lgame.box:box-width (.box planet)) 2.0))
+         (planet-half-h (/ (lgame.box:box-height (.box planet)) 2.0)))
     (loop for asteroid across asteroids
           for i from 0
           when asteroid
@@ -246,11 +246,11 @@
   (loop for asteroid across (.asteroids self)
         when asteroid
         do
-        (lgame.rect:with-rect (r (simple-asteroid-pos-x asteroid)
-                                 (simple-asteroid-pos-y asteroid)
-                                 (simple-asteroid-scaled-w asteroid)
-                                 (simple-asteroid-scaled-h asteroid))
-          (sdl2:render-copy lgame:*renderer* (simple-asteroid-texture asteroid) :dest-rect r))))
+        (let ((box (lgame.box:make-box (simple-asteroid-pos-x asteroid)
+                                       (simple-asteroid-pos-y asteroid)
+                                       (simple-asteroid-scaled-w asteroid)
+                                       (simple-asteroid-scaled-h asteroid))))
+          (lgame.render:blit (simple-asteroid-texture asteroid) box))))
 
 
 ; Another version, using a struct of arrays approach.
@@ -284,15 +284,15 @@
   (dotimes (i asteroids)
     (let* ((r (random 20.0))
            (angle (random (* 2 pi)))
-           (planet-y (rect-coord (.rect (.planet self)) :centery))
+           (planet-y (box-attr (.box (.planet self)) :centery))
            (image (get-texture (alexandria:random-elt textures)))
            (pos-x (+ 200 (* r (cos angle))))
            (pos-y (+ planet-y (* r (sin angle))))
            (vel-x (+ -5 (random 15.0)))
            (vel-y (+ 30 (random 30.0)))
            (scale (+ 0.1 (random 0.9)))
-           (scaled-w (* scale (sdl2:texture-width image)))
-           (scaled-h (* scale (sdl2:texture-height image))))
+           (scaled-w (* scale (lgame.texture:.width image)))
+           (scaled-h (* scale (lgame.texture:.height image))))
       (decf pos-x (* 0.5 scaled-w))
       (decf pos-y (* 0.5 scaled-h))
 
@@ -305,10 +305,10 @@
   (let* ((dt (dt))
          (all-asteroids (.asteroids self))
          (planet (.planet self))
-         (planet-x (rect-coord (.rect planet) :centerx))
-         (planet-y (rect-coord (.rect planet) :centery))
-         (planet-half-w (/ (sdl2:rect-width (.rect planet)) 2.0))
-         (planet-half-h (/ (sdl2:rect-height (.rect planet)) 2.0)))
+         (planet-x (box-attr (.box planet) :centerx))
+         (planet-y (box-attr (.box planet) :centery))
+         (planet-half-w (/ (lgame.box:box-width (.box planet)) 2.0))
+         (planet-half-h (/ (lgame.box:box-height (.box planet)) 2.0)))
 
     (loop for pos across (soa-asteroids-positions all-asteroids)
           for vel across (soa-asteroids-velocities all-asteroids)
@@ -341,11 +341,11 @@
         for scaled across (soa-asteroids-scales (.asteroids self))
         when pos
         do
-        (lgame.rect:with-rect (r (pair-x pos)
-                                 (pair-y pos)
-                                 (pair-x scaled)
-                                 (pair-y scaled))
-          (sdl2:render-copy lgame:*renderer* image :dest-rect r))))
+        (let ((box (lgame.box:make-box (pair-x pos)
+                                       (pair-y pos)
+                                       (pair-x scaled)
+                                       (pair-y scaled))))
+          (lgame.render:blit image box))))
 
 ;;;;
 ; The following code was generated by Claude Sonnet 4
@@ -400,7 +400,7 @@
     (setf (.asteroids self) soa)
 
     ;; Initialize asteroid data
-    (let ((planet-y (float (rect-coord (.rect planet) :centery) 0.0f0))
+    (let ((planet-y (float (box-attr (.box planet) :centery) 0.0f0))
           (pos-x-arr (fast-soa-asteroids-pos-x soa))
           (pos-y-arr (fast-soa-asteroids-pos-y soa))
           (vel-x-arr (fast-soa-asteroids-vel-x soa))
@@ -418,8 +418,8 @@
                (vel-x (+ -5.0f0 (random 15.0f0)))
                (vel-y (+ 30.0f0 (random 30.0f0)))
                (scale (+ 0.1f0 (random 0.9f0)))
-               (scaled-w (* scale (float (sdl2:texture-width image) 0.0f0)))
-               (scaled-h (* scale (float (sdl2:texture-height image) 0.0f0))))
+               (scaled-w (* scale (float (lgame.texture:.width image) 0.0f0)))
+               (scaled-h (* scale (float (lgame.texture:.height image) 0.0f0))))
 
           ;; Adjust position for centered rendering
           (setf (aref pos-x-arr i) (- base-pos-x (* 0.5f0 scaled-w))
@@ -435,11 +435,11 @@
   (let* ((dt (float (dt) 0.0f0))
          (soa (.asteroids self))
          (planet (.planet self))
-         (planet-x (float (rect-coord (.rect planet) :centerx) 0.0f0))
-         (planet-y (float (rect-coord (.rect planet) :centery) 0.0f0))
+         (planet-x (float (box-attr (.box planet) :centerx) 0.0f0))
+         (planet-y (float (box-attr (.box planet) :centery) 0.0f0))
          (planet-mass (float (.mass planet) 0.0f0))
-         (planet-half-w (float (/ (sdl2:rect-width (.rect planet)) 2.0) 0.0f0))
-         (planet-half-h (float (/ (sdl2:rect-height (.rect planet)) 2.0) 0.0f0))
+         (planet-half-w (float (/ (lgame.box:box-width (.box planet)) 2.0) 0.0f0))
+         (planet-half-h (float (/ (lgame.box:box-height (.box planet)) 2.0) 0.0f0))
 
          ;; Extract arrays for better compiler optimization
          (pos-x-arr (fast-soa-asteroids-pos-x soa))
@@ -515,11 +515,11 @@
       (loop for i of-type fixnum below capacity
             when (= 1 (aref alive-arr i))
             do
-            (lgame.rect:with-rect (r (truncate (aref pos-x-arr i))
-                                     (truncate (aref pos-y-arr i))
-                                     (truncate (aref scale-w-arr i))
-                                     (truncate (aref scale-h-arr i)))
-              (sdl2:render-copy lgame:*renderer* (aref tex-arr i) :dest-rect r))))))
+            (let ((box (lgame.box:make-box (truncate (aref pos-x-arr i))
+                                           (truncate (aref pos-y-arr i))
+                                           (truncate (aref scale-w-arr i))
+                                           (truncate (aref scale-h-arr i)))))
+              (lgame.render:blit (aref tex-arr i) box))))))
 
 ;; Convenience method to add this to your existing code:
 ;; Just replace asteroid-field-soa with asteroid-field-fast-soa in your init function
