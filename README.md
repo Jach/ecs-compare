@@ -19,6 +19,14 @@ keyword arguments `:only-ecs? t` or `:only-oop? t` to `main`.
 
 ![](screenshot.png)
 
+Additional note: if you want to run `mangohud`, then because of [this bug](https://bugs.launchpad.net/sbcl/+bug/1519630) you'll need to wrap main like so:
+
+```lisp
+(sb-int:with-float-traps-masked
+  (:divide-by-zero :invalid)
+  (ecs-compare:main :only-ecs? t :only-oop? nil))
+```
+
 # License
 
 `ecs-version.lisp` is under the MIT license with copyright to Andrew Kravchuk,
